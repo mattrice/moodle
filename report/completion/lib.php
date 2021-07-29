@@ -126,3 +126,26 @@ function report_completion_page_type_list($pagetype, $parentcontext, $currentcon
     );
     return $array;
 }
+
+/**
+ * Add nodes to myprofile page.
+ *
+ * @param \core_user\output\myprofile\tree $tree Tree object
+ * @param stdClass $user user object
+ * @param bool $iscurrentuser
+ * @param stdClass $course Course object
+ *
+ * @return bool
+ */
+function report_completion_myprofile_navigation(core_user\output\myprofile\tree $tree, $user, $iscurrentuser, $course) {
+    if (empty($course)) {
+        // We do not want to display these reports under the site context.
+        return false;
+    }
+    if (report_completion_can_access_user_report($user, $course)) {
+        $url = new moodle_url('/report/completion/index.php',
+                array('id' => $user->id, 'course' => $course->id));
+        $node = new core_user\output\myprofile\node('reports', 'course-completion', get_string('coursecompletion'), null, $url);
+        $tree->add_node($node);
+    }
+}

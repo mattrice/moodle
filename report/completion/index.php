@@ -44,6 +44,7 @@ $courseid = required_param('course', PARAM_INT);
 $format = optional_param('format','',PARAM_ALPHA);
 $sort = optional_param('sort','',PARAM_ALPHA);
 $edituser = optional_param('edituser', 0, PARAM_INT);
+$userid = optional_param('id', 0, PARAM_INT);
 
 
 $course = $DB->get_record('course', array('id' => $courseid), '*', MUST_EXIST);
@@ -76,12 +77,6 @@ $leftcols = 1 + count($extrafields);
 require_login($course);
 
 require_capability('report/completion:view', $context);
-
-// Get group mode
-$group = groups_get_course_group($course, true); // Supposed to verify group
-if ($group === 0 && $course->groupmode == SEPARATEGROUPS) {
-    require_capability('moodle/site:accessallgroups',$context);
-}
 
 /**
  * Load data
@@ -164,45 +159,64 @@ if ($csv) {
     $pluginname = get_string('pluginname', 'report_completion');
     report_helper::print_report_selector($pluginname);
 
-    // Handle groups (if enabled)
-    groups_print_course_menu($course, $CFG->wwwroot.'/report/completion/index.php?course='.$course->id);
-}
-
-if ($sifirst !== 'all') {
-    set_user_preference('ifirst', $sifirst);
-}
-if ($silast !== 'all') {
-    set_user_preference('ilast', $silast);
-}
-
-if (!empty($USER->preference['ifirst'])) {
-    $sifirst = $USER->preference['ifirst'];
-} else {
-    $sifirst = 'all';
-}
-
-if (!empty($USER->preference['ilast'])) {
-    $silast = $USER->preference['ilast'];
-} else {
-    $silast = 'all';
+    if (!$userid > 0) {
+        // Handle groups (if enabled)
+        groups_print_course_menu($course, $CFG->wwwroot.'/report/completion/index.php?course='.$course->id);
+    }
 }
 
 // Generate where clause
 $where = array();
-$where_params = array();
+$whereparams = array();
+
+if ($userid > 0) {
+    $where[] = $DB->sql_like('u.id', ':userid', false, false);
+    $whereparams['userid'] = $userid;
+
+    // Ignore first name, last name, and group filters when asking for a specific user
+    $sifirst = 'all';
+    $silast = 'all';
+    $group = false;
+}
+else {
+    // Get group mode
+    $group = groups_get_course_group($course, true); // Supposed to verify group
+    if ($group === 0 && $course->groupmode == SEPARATEGROUPS) {
+        require_capability('moodle/site:accessallgroups',$context);
+    }
+
+    if ($sifirst !== 'all') {
+        set_user_preference('ifirst', $sifirst);
+    }
+    if ($silast !== 'all') {
+        set_user_preference('ilast', $silast);
+    }
+
+    if (!empty($USER->preference['ifirst'])) {
+        $sifirst = $USER->preference['ifirst'];
+    } else {
+        $sifirst = 'all';
+    }
+
+    if (!empty($USER->preference['ilast'])) {
+        $silast = $USER->preference['ilast'];
+    } else {
+        $silast = 'all';
+    }
+}
 
 if ($sifirst !== 'all') {
     $where[] = $DB->sql_like('u.firstname', ':sifirst', false, false);
-    $where_params['sifirst'] = $sifirst.'%';
+    $whereparams['sifirst'] = $sifirst.'%';
 }
 
 if ($silast !== 'all') {
     $where[] = $DB->sql_like('u.lastname', ':silast', false, false);
-    $where_params['silast'] = $silast.'%';
+    $whereparams['silast'] = $silast.'%';
 }
 
 // Get user match count
-$total = $completion->get_num_tracked_users(implode(' AND ', $where), $where_params, $group);
+$total = $completion->get_num_tracked_users(implode(' AND ', $where), $whereparams, $group);
 
 // Total user count
 $grandtotal = $completion->get_num_tracked_users('', array(), $group);
@@ -220,7 +234,7 @@ $progress = array();
 if ($total) {
     $progress = $completion->get_progress_all(
         implode(' AND ', $where),
-        $where_params,
+        $whereparams,
         $group,
         $firstnamesort ? 'u.firstname ASC' : 'u.lastname ASC',
         $csv ? 0 : COMPLETION_REPORT_PAGE,
