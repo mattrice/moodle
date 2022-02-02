@@ -53,6 +53,7 @@ $silast  = optional_param('silast', 'all', PARAM_NOTAGS);
 $groupid = optional_param('group', 0, PARAM_INT);
 $activityinclude = optional_param('activityinclude', 'all', PARAM_TEXT);
 $activityorder = optional_param('activityorder', 'orderincourse', PARAM_TEXT);
+$userid = optional_param('id', 0, PARAM_INT);
 
 // Whether to show extra user identity information
 // TODO Does not support custom user profile fields (MDL-70456).
@@ -78,6 +79,13 @@ if ($format !== '') {
 if ($page !== 0) {
     $url->param('page', $page);
 }
+if ($userid > 0) {
+    $url->param('id', $userid);
+    // Ignore first name, last name, and group filters when asking for a specific user.
+    $sifirst = 'all';
+    $silast = 'all';
+    $group = false;
+}
 if ($sifirst !== 'all') {
     $url->param('sifirst', $sifirst);
 }
@@ -102,56 +110,71 @@ require_login($course);
 // Check basic permission
 require_capability('report/progress:view',$context);
 
-// Get group mode
-$group = groups_get_course_group($course,true); // Supposed to verify group
-if ($group===0 && $course->groupmode==SEPARATEGROUPS) {
-    require_capability('moodle/site:accessallgroups',$context);
-}
-
 // Get data on activities and progress of all users, and give error if we've
 // nothing to display (no users or no activities).
 $completion = new completion_info($course);
 list($activitytypes, $activities) = helper::get_activities_to_show($completion, $activityinclude, $activityorder);
 $output = $PAGE->get_renderer('report_progress');
 
-if ($sifirst !== 'all') {
-    set_user_preference('ifirst', $sifirst);
-}
-if ($silast !== 'all') {
-    set_user_preference('ilast', $silast);
-}
-
-if (!empty($USER->preference['ifirst'])) {
-    $sifirst = $USER->preference['ifirst'];
-} else {
-    $sifirst = 'all';
-}
-
-if (!empty($USER->preference['ilast'])) {
-    $silast = $USER->preference['ilast'];
-} else {
-    $silast = 'all';
-}
-
-// Generate where clause
+// Generate where clause.
 $where = array();
 $where_params = array();
 
-if ($sifirst !== 'all') {
-    $where[] = $DB->sql_like('u.firstname', ':sifirst', false, false);
-    $where_params['sifirst'] = $sifirst.'%';
-}
+if ($userid > 0) {
+    $where[] = $DB->sql_like('u.id', ':userid', false, false);
+    $where_params['userid'] = $userid;
 
-if ($silast !== 'all') {
-    $where[] = $DB->sql_like('u.lastname', ':silast', false, false);
-    $where_params['silast'] = $silast.'%';
+    // Ignore first name, last name, and group filters when asking for a specific user.
+    $sifirst = 'all';
+    $silast = 'all';
+    $group = false;
+} else {
+    // Get group mode.
+    $group = groups_get_course_group($course, true); // Supposed to verify group.
+    if ($group === 0 && $course->groupmode == SEPARATEGROUPS) {
+        require_capability('moodle/site:accessallgroups', $context);
+    }
+
+    if ($sifirst !== 'all') {
+        set_user_preference('ifirst', $sifirst);
+    }
+    if ($silast !== 'all') {
+        set_user_preference('ilast', $silast);
+    }
+
+    if (!empty($USER->preference['ifirst'])) {
+        $sifirst = $USER->preference['ifirst'];
+    } else {
+        $sifirst = 'all';
+    }
+
+    if (!empty($USER->preference['ilast'])) {
+        $silast = $USER->preference['ilast'];
+    } else {
+        $silast = 'all';
+    }
+
+    if ($sifirst !== 'all') {
+        $where[] = $DB->sql_like('u.firstname', ':sifirst', false, false);
+        $where_params['sifirst'] = $sifirst.'%';
+    }
+
+    if ($silast !== 'all') {
+        $where[] = $DB->sql_like('u.lastname', ':silast', false, false);
+        $where_params['silast'] = $silast.'%';
+    }
 }
 
 // Get user match count
 $total = $completion->get_num_tracked_users(implode(' AND ', $where), $where_params, $group);
 
-// Total user count
-$grandtotal = $completion->get_num_tracked_users('', array(), $group);
+if ($userid > 0) {
+    // When viewing a single user, the total possible users is not useful.
+    $grandtotal = $total;
+} else {
+    // Total user count.
+    $grandtotal = $completion->get_num_tracked_users('', array(), $group);
+}
 
 // Get user data
 $progress = array();
@@ -202,9 +225,11 @@ if ($csv && $grandtotal && count($activities)>0) { // Only show CSV if there are
     $PAGE->requires->js_call_amd('report_progress/completion_override', 'init', [fullname($USER)]);
 
     // Handle groups (if enabled).
-    $groupurl = fullclone($url);
-    $groupurl->remove_params(['page', 'group']);
-    groups_print_course_menu($course, $groupurl);
+    if (!$userid > 0) {
+        $groupurl = fullclone($url);
+        $groupurl->remove_params(['page', 'group']);
+        groups_print_course_menu($course, $groupurl);
+    }
 
     // Display include activity filter.
     echo $output->render_include_activity_select($url, $activitytypes, $activityinclude);
@@ -240,9 +265,9 @@ $pagingbar = '';
 $prefixfirst = 'sifirst';
 $prefixlast = 'silast';
 
-// The URL used in the initials bar should reset the 'start' parameter.
+// The URL used in the initials bar should reset the 'page' and 'id' parameters.
 $initialsbarurl = fullclone($url);
-$initialsbarurl->remove_params('page');
+$initialsbarurl->remove_params('page', 'id');
 
 $pagingbar .= $OUTPUT->initials_bar($sifirst, 'firstinitial mt-2', get_string('firstname'), $prefixfirst, $initialsbarurl);
 $pagingbar .= $OUTPUT->initials_bar($silast, 'lastinitial', get_string('lastname'), $prefixlast, $initialsbarurl);

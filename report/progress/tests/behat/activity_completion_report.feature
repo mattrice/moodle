@@ -17,10 +17,12 @@ Feature: Teacher can view and override users' activity completion data via the p
       | username | firstname | lastname    | email                | idnumber | middlename | alternatename | firstnamephonetic | lastnamephonetic |
       | teacher1 | Teacher   | One         | teacher1@example.com | t1       |            | fred          |                   |                  |
       | student1 | Grainne   | Beauchamp   | student1@example.com | s1       | Ann        | Jill          | Gronya            | Beecham          |
+      | student2 | Niamh     | Cholmondely | student2@example.com | s2       | Jane       | Nina          | Nee               | Chumlee          |
     And the following "course enrolments" exist:
-      | user | course | role |
-      | teacher1 | C1 | editingteacher |
-      | student1 | C1 | student |
+      | user     | course | role           |
+      | teacher1 | C1     | editingteacher |
+      | student1 | C1     | student        |
+      | student2 | C1     | student        |
     And the following config values are set as admin:
       | fullnamedisplay | firstname |
       | alternativefullnameformat | middlename, alternatename, firstname, lastname |
@@ -105,3 +107,21 @@ Feature: Teacher can view and override users' activity completion data via the p
     And the manual completion button of "my assignment" overridden by "Teacher" is displayed as "Done"
     And I toggle the manual completion state of "my assignment"
     And the manual completion button of "my assignment" is displayed as "Mark as done"
+
+  Scenario: User course profile links to filtered activity completion report (MDL-72240)
+    Given I log in as "teacher1"
+    And I am on "Course 1" course homepage
+    When I navigate to course participants
+    Then I should see "Ann, Jill, Grainne, Beauchamp" in the "Ann, Jill, Grainne, Beauchamp" "table_row"
+    And I click on "Ann, Jill, Grainne, Beauchamp" "link" in the "Ann, Jill, Grainne, Beauchamp" "table_row"
+    Then I should see "Activity completion" in the "region-main" "region"
+
+  Scenario: Activity completion report lists exactly the expected user (MDL-72240)
+    Given I log in as "teacher1"
+    And I am on "Course 1" course homepage
+    When I navigate to course participants
+    Then I should see "Jane, Nina, Niamh, Cholmondely" in the "Jane, Nina, Niamh, Cholmondely" "table_row"
+    And I click on "Jane, Nina, Niamh, Cholmondely" "link" in the "Jane, Nina, Niamh, Cholmondely" "table_row"
+    And I click on "Activity completion" "link" in the "region-main" "region"
+    Then I should see "Jane, Nina, Niamh, Cholmondely"
+    But I should not see "Ann, Jill, Grainne, Beauchamp"
