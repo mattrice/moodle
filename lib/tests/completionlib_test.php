@@ -1482,6 +1482,37 @@ class completionlib_test extends advanced_testcase {
         // The implicitly created grade_item does not have grade to pass defined so it is not distinguished.
         $this->assertEquals(COMPLETION_COMPLETE, $completioninfo->get_grade_completion($cm, $this->user->id));
     }
+
+    /**
+     * Test course completion options unlocked event.
+     *
+     * @covers \core\event\course_completion_options_unlocked
+     */
+    public function test_course_completion_options_unlocked_event() {
+        $this->setup_data();
+        $coursecontext = context_course::instance($this->course->id);
+        $optionsunlockedevent = \core\event\course_completion_options_unlocked::create(
+                array(
+                    'courseid' => $this->course->id,
+                    'context' => $coursecontext
+                    )
+                );
+
+        // Manually fire and trap triggered event for inspection.
+        $sink = $this->redirectEvents();
+        $optionsunlockedevent->trigger();
+        $events = $sink->get_events();
+        $event = array_pop($events);
+        $sink->close();
+
+        $this->assertInstanceOf('\core\event\course_completion_options_unlocked', $event);
+        $this->assertEquals($this->course->id, $event->courseid);
+        $this->assertEquals($coursecontext, $event->get_context());
+        $this->assertInstanceOf('moodle_url', $event->get_url());
+        $expectedlegacylog = array($this->course->id, 'course', 'completion options unlocked',
+            'completion.php?id='.$this->course->id);
+        $this->assertEventLegacyLogData($expectedlegacylog, $event);
+    }
 }
 
 class core_completionlib_fake_recordset implements Iterator {
