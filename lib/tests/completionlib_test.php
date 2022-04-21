@@ -1922,6 +1922,39 @@ class completionlib_test extends advanced_testcase {
         $this->assertEquals(1, count($completions));
         $this->assertEquals(reset($completions)->id, $completionid);
     }
+
+    /**
+     * Test course completion settings unlocked event.
+     *
+     * @covers \core\event\course_completion_settings_unlocked
+     */
+    public function test_course_completion_settings_unlocked_event() {
+        $this->setup_data();
+        $coursecontext = context_course::instance($this->course->id);
+        $settingsunlockedevent = \core\event\course_completion_settings_unlocked::create([
+            'courseid' => $this->course->id,
+            'context' => $coursecontext
+        ]);
+
+        // Manually fire and trap triggered event for inspection.
+        $sink = $this->redirectEvents();
+        $settingsunlockedevent->trigger();
+        $events = $sink->get_events();
+        $event = array_pop($events);
+        $sink->close();
+
+        $this->assertInstanceOf('\core\event\course_completion_settings_unlocked', $event);
+        $this->assertEquals($this->course->id, $event->courseid);
+        $this->assertEquals($coursecontext, $event->get_context());
+        $this->assertInstanceOf('moodle_url', $event->get_url());
+        $expectedlegacylog = [
+            $this->course->id,
+            'course',
+            'completion settings unlocked',
+            'completion.php?id='.$this->course->id
+        ];
+        $this->assertEventLegacyLogData($expectedlegacylog, $event);
+    }
 }
 
 class core_completionlib_fake_recordset implements Iterator {

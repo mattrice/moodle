@@ -90,6 +90,14 @@ if ($form->is_cancelled()){
     if (!empty($data->settingsunlock)) {
         $completion->delete_course_completion_data();
 
+        // Trigger an event.
+        $event = \core\event\course_completion_settings_unlocked::create([
+                'userid' => $USER->id,
+                'courseid' => $course->id,
+                'context' => context_course::instance($course->id)
+        ]);
+        $event->trigger();
+
         // Return to form (now unlocked).
         redirect($PAGE->url);
     }
