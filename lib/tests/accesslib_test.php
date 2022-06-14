@@ -1041,8 +1041,10 @@ class accesslib_test extends advanced_testcase {
 
         $this->resetAfterTest();
 
+        $this->setAdminUser();
         $otherid = create_role('Other role', 'other', 'Some other role', '');
         $student = $DB->get_record('role', array('shortname'=>'student'), '*', MUST_EXIST);
+        $admin = get_admin();
 
         $this->assertFalse($DB->record_exists('role_allow_assign', array('roleid'=>$otherid, 'allowassign'=>$student->id)));
         core_role_set_assign_allowed($otherid, $student->id);
@@ -1052,7 +1054,10 @@ class accesslib_test extends advanced_testcase {
         $allowroleassignevent = \core\event\role_allow_assign_updated::create([
             'context' => context_system::instance(),
             'objectid' => $otherid,
-            'other' => ['targetroleid' => $student->id]
+            'other' => [
+                'targetroleid' => $student->id,
+                'allow' => true,
+            ]
         ]);
         $sink = $this->redirectEvents();
         $allowroleassignevent->trigger();
@@ -1064,6 +1069,40 @@ class accesslib_test extends advanced_testcase {
         $baseurl = new moodle_url('/admin/roles/allow.php', array('mode' => $mode));
         $expectedlegacylog = array(SITEID, 'role', 'edit allow ' . $mode, str_replace($CFG->wwwroot . '/', '', $baseurl));
         $this->assertEventLegacyLogData($expectedlegacylog, $event);
+
+        // Test for the correct order of the information in the description.
+        $expecteddescription = "The user with id '$admin->id' modified the role with id '$otherid' " .
+            "to allow users with that role to assign the role with id '$student->id' to others.";
+        $this->assertEquals($expecteddescription, $event->get_description());
+
+        // Test removal event.
+        $this->assertTrue($DB->record_exists('role_allow_assign', ['roleid' => $otherid, 'allowassign' => $student->id]));
+        $DB->delete_records('role_allow_assign', ['roleid' => $otherid, 'allowassign' => $student->id]);
+        $this->assertFalse($DB->record_exists('role_allow_assign', ['roleid' => $otherid, 'allowassign' => $student->id]));
+
+        $disallowroleassignevent = \core\event\role_allow_assign_updated::create([
+            'context' => context_system::instance(),
+            'objectid' => $otherid,
+            'other' => [
+                'targetroleid' => $student->id,
+                'allow' => false,
+            ]
+        ]);
+        $sink = $this->redirectEvents();
+        $disallowroleassignevent->trigger();
+        $events = $sink->get_events();
+        $sink->close();
+        $event = array_pop($events);
+        $this->assertInstanceOf('\core\event\role_allow_assign_updated', $event);
+        $mode = 'assign';
+        $baseurl = new moodle_url('/admin/roles/allow.php', ['mode' => $mode]);
+        $expectedlegacylog = array(SITEID, 'role', 'edit allow ' . $mode, str_replace($CFG->wwwroot . '/', '', $baseurl));
+        $this->assertEventLegacyLogData($expectedlegacylog, $event);
+
+        // Test for the correct order of the information in the description.
+        $expecteddescription = "The user with id '$admin->id' modified the role with id '$otherid' " .
+            "to stop allowing users with that role to assign the role with id '$student->id' to others.";
+        $this->assertEquals($expecteddescription, $event->get_description());
     }
 
     /**
@@ -1076,8 +1115,10 @@ class accesslib_test extends advanced_testcase {
 
         $this->resetAfterTest();
 
+        $this->setAdminUser();
         $otherid = create_role('Other role', 'other', 'Some other role', '');
         $student = $DB->get_record('role', array('shortname'=>'student'), '*', MUST_EXIST);
+        $admin = get_admin();
 
         $this->assertFalse($DB->record_exists('role_allow_override', array('roleid'=>$otherid, 'allowoverride'=>$student->id)));
         core_role_set_override_allowed($otherid, $student->id);
@@ -1087,7 +1128,10 @@ class accesslib_test extends advanced_testcase {
         $allowroleassignevent = \core\event\role_allow_override_updated::create([
             'context' => context_system::instance(),
             'objectid' => $otherid,
-            'other' => ['targetroleid' => $student->id]
+            'other' => [
+                'targetroleid' => $student->id,
+                'allow' => true,
+            ]
         ]);
         $sink = $this->redirectEvents();
         $allowroleassignevent->trigger();
@@ -1099,6 +1143,40 @@ class accesslib_test extends advanced_testcase {
         $baseurl = new moodle_url('/admin/roles/allow.php', array('mode' => $mode));
         $expectedlegacylog = array(SITEID, 'role', 'edit allow ' . $mode, str_replace($CFG->wwwroot . '/', '', $baseurl));
         $this->assertEventLegacyLogData($expectedlegacylog, $event);
+
+        // Test for the correct order of the information in the description.
+        $expecteddescription = "The user with id '$admin->id' modified the role with id '$otherid' " .
+            "to allow users with that role to set overrides for the role with id '$student->id'.";
+        $this->assertEquals($expecteddescription, $event->get_description());
+
+        // Test removal event.
+        $this->assertTrue($DB->record_exists('role_allow_override', ['roleid' => $otherid, 'allowoverride' => $student->id]));
+        $DB->delete_records('role_allow_override', ['roleid' => $otherid, 'allowoverride' => $student->id]);
+        $this->assertFalse($DB->record_exists('role_allow_override', ['roleid' => $otherid, 'allowoverride' => $student->id]));
+
+        $disallowroleassignevent = \core\event\role_allow_override_updated::create([
+            'context' => context_system::instance(),
+            'objectid' => $otherid,
+            'other' => [
+                'targetroleid' => $student->id,
+                'allow' => false,
+            ]
+        ]);
+        $sink = $this->redirectEvents();
+        $disallowroleassignevent->trigger();
+        $events = $sink->get_events();
+        $sink->close();
+        $event = array_pop($events);
+        $this->assertInstanceOf('\core\event\role_allow_override_updated', $event);
+        $mode = 'override';
+        $baseurl = new moodle_url('/admin/roles/allow.php', ['mode' => $mode]);
+        $expectedlegacylog = array(SITEID, 'role', 'edit allow ' . $mode, str_replace($CFG->wwwroot . '/', '', $baseurl));
+        $this->assertEventLegacyLogData($expectedlegacylog, $event);
+
+        // Test for the correct order of the information in the description.
+        $expecteddescription = "The user with id '$admin->id' modified the role with id '$otherid' " .
+            "to stop allowing users with that role to set overrides for the role with id '$student->id'.";
+        $this->assertEquals($expecteddescription, $event->get_description());
     }
 
     /**
@@ -1111,8 +1189,10 @@ class accesslib_test extends advanced_testcase {
 
         $this->resetAfterTest();
 
+        $this->setAdminUser();
         $otherid = create_role('Other role', 'other', 'Some other role', '');
         $student = $DB->get_record('role', array('shortname'=>'student'), '*', MUST_EXIST);
+        $admin = get_admin();
 
         $this->assertFalse($DB->record_exists('role_allow_switch', array('roleid'=>$otherid, 'allowswitch'=>$student->id)));
         core_role_set_switch_allowed($otherid, $student->id);
@@ -1122,7 +1202,10 @@ class accesslib_test extends advanced_testcase {
         $allowroleassignevent = \core\event\role_allow_switch_updated::create([
             'context' => context_system::instance(),
             'objectid' => $otherid,
-            'other' => ['targetroleid' => $student->id]
+            'other' => [
+                'targetroleid' => $student->id,
+                'allow' => true,
+            ]
         ]);
         $sink = $this->redirectEvents();
         $allowroleassignevent->trigger();
@@ -1134,6 +1217,40 @@ class accesslib_test extends advanced_testcase {
         $baseurl = new moodle_url('/admin/roles/allow.php', array('mode' => $mode));
         $expectedlegacylog = array(SITEID, 'role', 'edit allow ' . $mode, str_replace($CFG->wwwroot . '/', '', $baseurl));
         $this->assertEventLegacyLogData($expectedlegacylog, $event);
+
+        // Test for the correct order of the information in the description.
+        $expecteddescription = "The user with id '$admin->id' modified the role with id '$otherid' " .
+            "to allow users with that role to switch to the role with id '$student->id'.";
+        $this->assertEquals($expecteddescription, $event->get_description());
+
+        // Test removal event.
+        $this->assertTrue($DB->record_exists('role_allow_switch', ['roleid' => $otherid, 'allowswitch' => $student->id]));
+        $DB->delete_records('role_allow_switch', ['roleid' => $otherid, 'allowswitch' => $student->id]);
+        $this->assertFalse($DB->record_exists('role_allow_switch', ['roleid' => $otherid, 'allowswitch' => $student->id]));
+
+        $disallowroleassignevent = \core\event\role_allow_switch_updated::create([
+            'context' => context_system::instance(),
+            'objectid' => $otherid,
+            'other' => [
+                'targetroleid' => $student->id,
+                'allow' => false,
+            ]
+        ]);
+        $sink = $this->redirectEvents();
+        $disallowroleassignevent->trigger();
+        $events = $sink->get_events();
+        $sink->close();
+        $event = array_pop($events);
+        $this->assertInstanceOf('\core\event\role_allow_switch_updated', $event);
+        $mode = 'switch';
+        $baseurl = new moodle_url('/admin/roles/allow.php', ['mode' => $mode]);
+        $expectedlegacylog = array(SITEID, 'role', 'edit allow ' . $mode, str_replace($CFG->wwwroot . '/', '', $baseurl));
+        $this->assertEventLegacyLogData($expectedlegacylog, $event);
+
+        // Test for the correct order of the information in the description.
+        $expecteddescription = "The user with id '$admin->id' modified the role with id '$otherid' " .
+            "to stop allowing users with that role to switch to the role with id '$student->id'.";
+        $this->assertEquals($expecteddescription, $event->get_description());
     }
 
     /**
@@ -1146,8 +1263,10 @@ class accesslib_test extends advanced_testcase {
 
         $this->resetAfterTest();
 
+        $this->setAdminUser();
         $otherid = create_role('Other role', 'other', 'Some other role', '');
         $student = $DB->get_record('role', array('shortname' => 'student'), '*', MUST_EXIST);
+        $admin = get_admin();
 
         $this->assertFalse($DB->record_exists('role_allow_view', array('roleid' => $otherid, 'allowview' => $student->id)));
         core_role_set_view_allowed($otherid, $student->id);
@@ -1157,7 +1276,10 @@ class accesslib_test extends advanced_testcase {
         $allowroleassignevent = \core\event\role_allow_view_updated::create([
             'context' => context_system::instance(),
             'objectid' => $otherid,
-            'other' => ['targetroleid' => $student->id]
+            'other' => [
+                'targetroleid' => $student->id,
+                'allow' => true,
+            ]
         ]);
         $sink = $this->redirectEvents();
         $allowroleassignevent->trigger();
@@ -1169,6 +1291,40 @@ class accesslib_test extends advanced_testcase {
         $baseurl = new moodle_url('/admin/roles/allow.php', array('mode' => $mode));
         $expectedlegacylog = array(SITEID, 'role', 'edit allow ' . $mode, str_replace($CFG->wwwroot . '/', '', $baseurl));
         $this->assertEventLegacyLogData($expectedlegacylog, $event);
+
+        // Test for the correct order of the information in the description.
+        $expecteddescription = "The user with id '$admin->id' modified the role with id '$otherid' " .
+            "to allow users with that role to view the role with id '$student->id'.";
+        $this->assertEquals($expecteddescription, $event->get_description());
+
+        // Test removal.
+        $this->assertTrue($DB->record_exists('role_allow_view', ['roleid' => $otherid, 'allowview' => $student->id]));
+        $DB->delete_records('role_allow_view', ['roleid' => $otherid, 'allowview' => $student->id]);
+        $this->assertFalse($DB->record_exists('role_allow_view', ['roleid' => $otherid, 'allowview' => $student->id]));
+
+        $allowroleassignevent = \core\event\role_allow_view_updated::create([
+            'context' => context_system::instance(),
+            'objectid' => $otherid,
+            'other' => [
+                'targetroleid' => $student->id,
+                'allow' => false,
+            ]
+        ]);
+        $sink = $this->redirectEvents();
+        $allowroleassignevent->trigger();
+        $events = $sink->get_events();
+        $sink->close();
+        $event = array_pop($events);
+        $this->assertInstanceOf('\core\event\role_allow_view_updated', $event);
+        $mode = 'view';
+        $baseurl = new moodle_url('/admin/roles/allow.php', ['mode' => $mode]);
+        $expectedlegacylog = array(SITEID, 'role', 'edit allow ' . $mode, str_replace($CFG->wwwroot . '/', '', $baseurl));
+        $this->assertEventLegacyLogData($expectedlegacylog, $event);
+
+        // Test for the correct order of the information in the description.
+        $expecteddescription = "The user with id '$admin->id' modified the role with id '$otherid' " .
+            "to stop allowing users with that role to view the role with id '$student->id'.";
+        $this->assertEquals($expecteddescription, $event->get_description());
     }
 
     /**

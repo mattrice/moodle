@@ -61,8 +61,8 @@ class role_allow_override_updated extends base {
      */
     public function get_description() {
         $action = ($this->other['allow']) ? 'allow' : 'stop allowing';
-        return "The user with id '$this->userid' modified the role with id '" . $this->other['targetroleid']
-            . "' to $action users with that role from overriding the role with id '" . $this->objectid . "' to users";
+        return "The user with id '$this->userid' modified the role with id '$this->objectid' " .
+                "to $action users with that role to set overrides for the role with id '{$this->other['targetroleid']}'.";
     }
 
     /**

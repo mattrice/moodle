@@ -61,8 +61,8 @@ class role_allow_view_updated extends base {
      */
     public function get_description() {
         $action = ($this->other['allow']) ? 'allow' : 'stop allowing';
-        return "The user with id '$this->userid' modified the role with id '" . $this->other['targetroleid']
-            . "' to $action users with that role from viewing the role with id '" . $this->objectid . "' to users";
+        return "The user with id '$this->userid' modified the role with id '$this->objectid' " .
+                "to $action users with that role to view the role with id '{$this->other['targetroleid']}'.";
     }
 
     /**
